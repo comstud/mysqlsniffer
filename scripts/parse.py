@@ -11,6 +11,7 @@ DATE_RE = re.compile("'\d\d\d\d\-\d\d\-\d\d \d\d:\d\d:\d\d\.\d+'")
 INT_RE = re.compile("= \d+")
 # Must be last
 IN_RE = re.compile("IN \(.*'<argument>'\)")
+INST_Q_RE = re.compile("SELECT anon_1.instances_created_at AS anon_1_instances_created_at.*FROM..SELECT..*FROM instances")
 
 def parse_file(queries, fname):
     with open(fname, 'r') as f:
@@ -23,6 +24,7 @@ def parse_file(queries, fname):
             query = DATE_RE.sub("'<date>'", query)
             query = INT_RE.sub("= <number>", query)
             query = IN_RE.sub("IN (<LIST>)", query)
+            query = INST_Q_RE.sub("SELECT <instance_shit> FROM (SELECT <more_instance_shit> FROM instances", query)
             queries[query]['queries'] += 1
             queries[query]['resp_sz'] += int(resp_sz)
             queries[query]['rows'] += int(rows)
