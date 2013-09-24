@@ -478,7 +478,10 @@ int pkt_row(u_char *pkt, u_int len)
 #if 0
    printf("||");
 #endif
-//   printf("Got row\n");
+   tag->rows++;
+   /* We don't care about actually processing the row */
+   return PKT_HANDLED;
+
    while(1) {
       col_LC = *pkt;
 
@@ -528,7 +531,6 @@ int pkt_row(u_char *pkt, u_int len)
       pkt += real_col_len;
       end += real_col_len;
    }
-   tag->rows++;
 #if 0
    printf("|");
 #endif
