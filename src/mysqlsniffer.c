@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
 
       dev = argv[optind];
       if(!dev) {
-         printf("No network interface name given\n\n");
+         printf("No filename given\n\n");
          show_help();
       }
 
@@ -102,17 +102,20 @@ int main(int argc, char *argv[])
    else
       show_help();
 
+#if 0
    if(pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
       printf("Couldn't get netmask for device %s: %s\n", dev, errbuf);
       net = mask = 0;
 	}
+#endif
 
-   handle = pcap_open_live(dev, SNAP_LEN, 1, 0, errbuf);
+   handle = pcap_open_offline(dev, errbuf);
    if(handle == NULL) {
-      printf("Couldn't open device %s: %s\n", dev, errbuf);
+      printf("Couldn't open file %s: %s\n", dev, errbuf);
       exit(-1);
    }
 
+#if 0
    if(pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
       printf("Couldn't parse filter %s: %s\n", filter_exp, pcap_geterr(handle));
       exit(-1);
@@ -124,6 +127,7 @@ int main(int argc, char *argv[])
    }
 
    printf("mysqlsniffer listening for MySQL on interface %s %s\n", dev, filter_exp);
+#endif
 
    signal(SIGINT, handle_ctrl_c);
    signal(SIGHUP, handle_sighup);
@@ -133,7 +137,9 @@ int main(int argc, char *argv[])
 
    pcap_loop(handle, -1, proc_packet, NULL);
 
+#if 0
    printf("ERROR: pcap_loop returned from an infinite loop\n");
+#endif
 
    cleanup();
    print_stats();
@@ -255,7 +261,9 @@ void proc_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *p
 
    if(size_mysql > 0 || op.tcp_ctrl) {
       if(ntohs(tcp->th_sport) == op.port_n) {
+#if 0
          printf("server > %s.%d: ", inet_ntoa(ip->ip_dst), ntohs(tcp->th_dport));
+#endif
          tag = get_tag((u_int)ip->ip_dst.s_addr, tcp->th_dport);
          if(!tag) {
             printf("Out of tracking tags; can't track any more connections.\n");
@@ -264,7 +272,9 @@ void proc_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *p
          origin = ORIGIN_SERVER;
       }
       else {
+#if 0
          printf("%s.%d > server: ", inet_ntoa(ip->ip_src), ntohs(tcp->th_sport));
+#endif
          tag = get_tag((u_int)ip->ip_src.s_addr, tcp->th_sport);
          if(!tag) {
             printf("Out of tracking tags; can't track any more connections.\n");
@@ -296,8 +306,10 @@ void proc_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *p
       tag->current_origin = origin; // Set here so TCP ctrl msgs don't mess things up
       retval = multi_pkts(mysql, size_mysql);
    }
+#if 0
    else
       printf("MySQL packet is too small: %d bytes\n", size_mysql);
+#endif
 
    if(retval == PKT_PARSED_OK)
       tag->last_origin = tag->current_origin;
@@ -328,7 +340,9 @@ int multi_pkts(const u_char *pkts, u_int total_len)
    if(tag->pkt_fragment) {
       tag->pkt_fragment = 0;
 
+#if 0
       printf("\n\t::FRAGMENT START::\n\t");
+#endif
 
       if(buff_frag)
          buff_frag = (u_char *)realloc(buff_frag, tag->frag_len + total_len);
@@ -361,7 +375,9 @@ int multi_pkts(const u_char *pkts, u_int total_len)
             tag->frag = (u_char *)malloc(tag->frag_len);
          memcpy(tag->frag, pkts, tag->frag_len);
 
+#if 0
          printf("::FRAGMENT END::\n");
+#endif
 
          retval = PKT_FRAGMENTED;
          break;
@@ -369,18 +385,31 @@ int multi_pkts(const u_char *pkts, u_int total_len)
 
       tag->current_pkt_id = m->pkt_id;
 
+#if 0
       if(!op.no_myhdrs) printf("ID %u len %u ", m->pkt_id, m->pkt_length);
+#endif
 
       total_mysql_pkts++;
       total_mysql_bytes = total_mysql_bytes + 4 + m->pkt_length;
+      tag->reply_bytes += 4 + m->pkt_length;
 
       if(m->pkt_length) {
-         memcpy(buff, pkts, m->pkt_length);
-         retval = parse_pkt(buff, m->pkt_length);
+         if (m->pkt_length > sizeof(buff)) {
+#if 0
+             printf("Fuck: %d\n", m->pkt_length);
+#else
+             ;
+#endif
+         } else {
+            memcpy(buff, pkts, m->pkt_length);
+            retval = parse_pkt(buff, m->pkt_length);
+         }
       }
+#if 0
       else
          printf("ID %u Zero-length MySQL packet ", m->pkt_id);
       printf("\n");
+#endif
 
       tag->last_pkt_id = m->pkt_id;
 
@@ -392,7 +421,9 @@ int multi_pkts(const u_char *pkts, u_int total_len)
       if(retval == PKT_PARSED_OK)
          tag->last_origin = tag->current_origin;
 
+#if 0
       printf("\t");
+#endif
    }
 
    return retval;
@@ -456,8 +487,10 @@ DETERMINE_PKT:
               weird happened like the server responding for no reason (perhaps
               the client sent a TCP re-xmit?)
             */
+#if 0
             printf("Waiting for server to finish response... ");
             dump_pkt(pkt, len, 0);
+#endif
             tag->state = STATE_SLEEP; // Will be asleep when done
             tag->last_origin = 0;
             return PKT_UNKNOWN_STATE; // Keeps multi_pkts() from setting tag->last_origin
@@ -486,7 +519,9 @@ DETERMINE_PKT:
       tag->current_origin == ORIGIN_CLIENT &&
       tag->state != STATE_SLEEP)
    {
+#if 0
       printf("::RETRANSMIT:: ");
+#endif
       tag->state = STATE_SLEEP;
    }
 
@@ -528,15 +563,19 @@ DETERMINE_PKT:
 
    // ...Check if pkt was handled
    if(!ha) {
+#if 0
       printf("::Unhandled Event:: ");
+#endif
 
       if(!have_failed_before) {
          have_failed_before = 1; // Prevent infinite loop
          goto DETERMINE_PKT;
       }
       else {
+#if 0
          printf("Client pkt has no valid handler ");
          dump_pkt(pkt, len, 1);
+#endif
          return PKT_UNKNOWN_STATE;
       }
    }

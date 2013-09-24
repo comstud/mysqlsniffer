@@ -40,6 +40,9 @@ struct st_tag_id {
    u_int   n_fields;
    field_types *fields;
    u_short current_field;
+   u_int   reply_bytes;
+   char    *query;
+   int rows;
 };
 typedef struct st_tag_id tag_id;
 

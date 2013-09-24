@@ -41,7 +41,9 @@ int pkt_handshake_server(u_char *pkt, u_int len)
    pkt    += 15; // 2 for status, 13 for zero-byte padding
    salt2   = pkt;
 
+#if 0
    printf("Handshake <proto %u ver %s thd %d> ", (u_int)proto, ver, thd_id);
+#endif
    if(op.verbose) unmask_caps(caps);
 
    return PKT_HANDLED;
@@ -87,8 +89,10 @@ int pkt_handshake_client(u_char *pkt, u_int len)
       db = (caps & CLIENT_CONNECT_WITH_DB ? pkt : 0);
    }
 
+#if 0
    printf("Handshake (%s auth) <user %s db %s max pkt %u> ",
             (caps & CLIENT_SECURE_CONNECTION ? "new" : "old"), user, db, max_pkt);
+#endif
    if(op.verbose) unmask_caps(caps);
 
    return PKT_HANDLED;
@@ -119,15 +123,19 @@ int pkt_ok(u_char *pkt, u_int len)
       warn     = G2(pkt);
    }
 
+#if 0
    printf("OK <fields %u affected rows %u insert id %u warnings %u> ",
           field_count, rows, insert_id, warn);
+#endif
    if(op.verbose) unmask_status(status);
 
    if(len > 7 || (op.v40 && len > 5)) { // Extra info on end of pkt
       pkt += 3;
       memcpy(msg, pkt, len - 8);
       msg[len - 8] = 0;
+#if 0
       printf(" (%s)", msg);
+#endif
    }
 
    return PKT_HANDLED;
@@ -153,12 +161,44 @@ int pkt_end(u_char *pkt, u_int len)
             return PKT_WRONG_TYPE;
    }
 
+#if 0
    printf("End ");
+#endif
 
-   if(status & SERVER_MORE_RESULTS_EXISTS) printf("Multi-Result ");
+   if(status & SERVER_MORE_RESULTS_EXISTS)
+   {
+#if 0
+       printf("Multi-Result %d ", tag->reply_bytes);
+#else
+       ;
+#endif
+   }
+
+#if 0
+   printf("[%d] END %s %d %d\n", tag->id_port, tag->current_origin == ORIGIN_SERVER ? "server" :"client", tag->rows, tag->reply_bytes);
+
+   if (tag->current_origin == ORIGIN_SERVER &&
+       (/*tag->event == EVENT_END || */tag->event == EVENT_END_MULTI_RESULT))
+   {
+      if (tag->query)
+      {
+          printf("%d %d (%d): %s\n", tag->reply_bytes, tag->rows,
+                                strlen(tag->query),
+                                tag->query);
+          free(tag->query);
+          tag->query = NULL;
+      }
+/*
+      tag->reply_bytes = 0;
+      tag->rows = 0;
+*/
+   }
+#endif
 
    if(len > 1) { // 4.1+
+#if 0
       printf("<warnings %u> ", warn);
+#endif
       if(op.verbose) unmask_status(status);
    }
 
@@ -211,11 +251,47 @@ int pkt_com_x(u_char *pkt, u_int len)
 
    if(!pkt_match_event) return PKT_WRONG_TYPE;
 
+#if 0
    printf("COM_%s", command_name[*pkt]);
+#endif
 
    if(tag->event == COM_QUIT) remove_tag(tag);
 
    return PKT_HANDLED;
+}
+
+void _make_query(const char *cmd_name, const char *arg)
+{
+    char *query;
+    char *ptr;
+
+    query = malloc(strlen(cmd_name) + 7 + strlen(arg));
+    sprintf(query, "COM_%s: %s", cmd_name, arg);
+    for(ptr=query;*ptr;ptr++)
+        if (*ptr == '\n')
+            *ptr = ' ';
+#if 1
+    if (tag->query != NULL)
+    {
+        printf("%d %d (%d): %s\n", tag->reply_bytes, tag->rows,
+                                   strlen(tag->query),
+                                   tag->query);
+        free(tag->query);
+        tag->query = NULL;
+    }
+#endif
+    if (tag->query == NULL)
+    {
+        tag->query = query;
+        tag->reply_bytes = 0;
+        tag->rows = 0;
+    }
+#if 0
+    else
+    {
+        free(query);
+    }
+#endif
 }
 
 int pkt_com_x_string(u_char *pkt, u_int len)
@@ -238,7 +314,20 @@ int pkt_com_x_string(u_char *pkt, u_int len)
 
    if(!pkt_match_event) return PKT_WRONG_TYPE;
 
-   printf("COM_%s: %s", command_name[*pkt], get_arg(pkt, len));
+#if 0
+   printf("COM_%s: %s ", command_name[*pkt], get_arg(pkt, len));
+   if (tag->event == COM_QUERY)
+       printf("GOT QUERY\n");
+#endif
+
+#if 0
+   if (tag->event == COM_QUERY)
+   {
+#endif
+       _make_query(command_name[*pkt], get_arg(pkt, len));
+#if 0
+   }
+#endif
 
    return PKT_HANDLED;
 }
@@ -259,9 +348,20 @@ int pkt_com_x_int(u_char *pkt, u_int len)
 
    if(!pkt_match_event) return PKT_WRONG_TYPE;
 
+#if 0
    printf("COM_%s: ", command_name[*pkt]);
+#endif
    *pkt++;
+#if 0
    printf("%u", get_uint(pkt));
+#endif
+   {
+       char buf[512];
+
+       sprintf(buf, "%u", get_uint(pkt));
+
+       _make_query(command_name[*pkt], buf);
+   }
 
    return PKT_HANDLED;
 }
@@ -286,7 +386,9 @@ int pkt_n_fields(u_char *pkt, u_int len)
 
    decode_len(pkt);
 
+#if 0
    printf("%llu Fields", decoded_len);
+#endif
 
    if(EVENT_NUM_FIELDS_BIN) {
       tag->n_fields      = (u_int)*pkt; // Used by pkt_binary_row()
@@ -345,8 +447,10 @@ int pkt_field(u_char *pkt, u_int len)
       tag->fields->field_flags[tag->current_field++] = flags;
    }
 
+#if 0
    printf("Field: %s.%s.%s <type %s (%u) size %u>", db, table, field,
           get_field_type(field_type), (u_int)field_type, field_len);
+#endif
 
    return PKT_HANDLED;
 }
@@ -371,7 +475,10 @@ int pkt_row(u_char *pkt, u_int len)
    ulonglong real_col_len;
    static u_char col_data[MAX_COL_LEN + 9]; // +9 for '::TRUNC::' if necessary
 
+#if 0
    printf("||");
+#endif
+//   printf("Got row\n");
    while(1) {
       col_LC = *pkt;
 
@@ -397,14 +504,21 @@ int pkt_row(u_char *pkt, u_int len)
             else
                col_data[col_len] = 0;
 
+#if 0
             printf(" %s |", col_data);
+#endif
          }
          else
+             ;
+#if 0
             printf("  |"); // Empty string ''
+#endif
       }
       else {
          real_col_len = 0;
+#if 0
          printf(" NULL |");
+#endif
       }
 
       if((end + real_col_len) >= len) break;
@@ -414,7 +528,10 @@ int pkt_row(u_char *pkt, u_int len)
       pkt += real_col_len;
       end += real_col_len;
    }
+   tag->rows++;
+#if 0
    printf("|");
+#endif
 
    return PKT_HANDLED;
 }
