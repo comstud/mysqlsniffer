@@ -15,13 +15,13 @@ MAC_RE = re.compile("mac = '(\w\w:){5}\w\w'")
 # Must be last
 IN_RE = re.compile("IN \(.*'<argument>'\)")
 MULTI_JOIN_RE = re.compile("LEFT OUTER JOIN (\S+)")
-JOIN_RE = re.compile("LEFT OUTER JOIN.*(LIMIT|WHERE|\)|$)")
+JOIN_RE = re.compile("LEFT OUTER JOIN.*?(LIMIT|WHERE|\)|$)")
 
 def parse_joins(q_str):
     m = MULTI_JOIN_RE.findall(q_str)
     if not m:
         return q_str
-    join_str = "JOIN %s" % str(sorted(m))
+    join_str = r"JOIN %s \1" % str(sorted(m))
     return JOIN_RE.sub(join_str, q_str)
 
 def parse_file(queries, fname):
